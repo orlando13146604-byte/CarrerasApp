@@ -1,0 +1,20 @@
+{
+  "name": "carrerasAPP Premium",
+  "short_name": "carrerasAPP",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#f4f7f9",
+  "theme_color": "#0284c7",
+  "icons": [{"src": "https://cdn-icons-png.flaticon.com/512/1048/1048313.png", "sizes": "512x512", "type": "image/png"}],
+  "share_target": {
+    "action": "/index.html?shared=true",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "name",
+      "text": "description",
+      "url": "link",
+      "files": [{ "name": "file", "accept": ["image/*"] }]
+    }
+  }
+}

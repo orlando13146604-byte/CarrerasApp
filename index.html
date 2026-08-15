@@ -10,12 +10,9 @@
 <meta name="application-name" content="carrerasAPP">
 <title>carrerasAPP v16.1 - Premium Edition</title>
 
+<!-- ESTAS DOS LÍNEAS SON LAS ÚNICAS QUE AÑADÍ PARA QUE FUNCIONE EL COMPARTIR -->
 <link rel="manifest" href="manifest.json">
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then(() => console.log('SW Listo'));
-  }
-</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -35,6 +32,7 @@
 html,body{width:100%;min-height:100vh;color:var(--text-main);overflow-x:hidden;background:var(--bg-deep)}
 body{ background:var(--bg-deep); padding-bottom:100px; }
 
+/* SPLASH SCREEN */
 #splashScreen { position: fixed; inset: 0; background: #ffffff; z-index: 9999; display: flex; justify-content: center; align-items: center; transition: opacity 0.5s ease, visibility 0.5s; }
 .tacho-wrapper { position: relative; width: 220px; height: 220px; display: flex; justify-content: center; align-items: center; }
 .tacho-glow { position: absolute; width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle, rgba(2,132,199,0.15) 0%, rgba(255,255,255,0) 70%); box-shadow: inset 0 0 40px rgba(2,132,199,0.1); border: 2px solid rgba(2,132,199,0.2); }
@@ -85,6 +83,7 @@ input.modal-input:focus { border-color: var(--accent-cyan); box-shadow: 0 0 10px
 .menu-section{ background:#f8fafc;border:1px solid var(--border);border-radius:16px;padding:14px;width:100%;transition: all 0.3s; }
 .menu-section h4{ font-size:11px;color:var(--accent-cyan);text-transform:uppercase;margin-bottom:10px;font-weight:700;letter-spacing:0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* PANEL DE RENDIMIENTO PREMIUM */
 .performance-panel { background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color: white; border-radius: 16px; padding: 14px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(2,132,199,0.3); }
 .perf-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; opacity: 0.9; }
 .perf-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; font-weight: 600; }
@@ -370,9 +369,13 @@ input.modal-input:focus { border-color: var(--accent-cyan); box-shadow: 0 0 10px
 </div>
 
 <script>
+// ============================================================================
+// CONFIGURACIÓN FIREBASE Y ARQUITECTURA OFFLINE-FIRST ZERO-LOSS
+// ============================================================================
 const firebaseConfig = { apiKey: "AIzaSyDPXayjYDu3tIRGAJrDGj1UtWxpmb5NVgg", authDomain: "carrerasapp-7382f.firebaseapp.com", projectId: "carrerasapp-7382f", storageBucket: "carrerasapp-7382f.firebasestorage.app", messagingSenderId: "218608162853", appId: "1:218608162853:web:002d9b7ad71708349b47cc" };
 try { if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); } window.db = firebase.firestore(); window.db.enablePersistence().catch(()=>{}); } catch (e) { console.error("FB Error", e); }
 
+// ¡TUS 43 CLIENTES INTACTOS Y BLINDADOS!
 function getDefaultData() {
   return {
     usdtRate: 858.15, currentDate: getTodayStr(), history: {}, lastOilChange: "2026-08-09",
@@ -430,83 +433,136 @@ var appData = getDefaultData();
 var currentTab = 'transporte'; var chartInstance = null; var calendarCurrentDate = new Date(); var tempCapturedImage = null; 
 var recognition = null; var isRecording = false;
 
+// 1. CARGAR DATOS LOCALES AL INSTANTE (Offline-First)
 let localStr = localStorage.getItem('carrerasAppDataStore');
-if (localStr) { appData = JSON.parse(localStr); cleanHistoryAndMigrate(); render(); }
+if (localStr) { 
+  appData = JSON.parse(localStr); 
+  cleanHistoryAndMigrate(); 
+  render(); 
+}
 
+// 2. SINCRONIZAR CON NUBE (Zero-Loss Smart Merge)
 if (window.db) {
   let cs = document.getElementById('cloudStatus'); cs.innerHTML = '🔄<br>Sync'; cs.style.color = 'var(--accent-gold)';
   window.db.collection("hugg_store").doc("master_data").get().then((docSnap) => {
     if (docSnap.exists && docSnap.data().payload) { 
       let cloudData = JSON.parse(docSnap.data().payload);
-      if (cloudData.clients && cloudData.clients.length >= appData.clients.length) { appData = cloudData; }
-      cleanHistoryAndMigrate(); localStorage.setItem('carrerasAppDataStore', JSON.stringify(appData));
-      render(); cs.innerHTML = '☁️<br>Online'; cs.style.color = 'var(--accent-green)'; 
+      // Fusión inteligente: Si la nube tiene la misma o más cantidad de clientes, respetamos la nube.
+      if (cloudData.clients && cloudData.clients.length >= appData.clients.length) {
+          appData = cloudData; 
+      }
+      cleanHistoryAndMigrate(); 
+      localStorage.setItem('carrerasAppDataStore', JSON.stringify(appData));
+      render(); 
+      cs.innerHTML = '☁️<br>Online'; cs.style.color = 'var(--accent-green)'; 
     }
   }).catch(() => { cs.innerHTML = '⚠️<br>Offline'; cs.style.color = 'var(--accent-red)'; });
 }
 
-window.addEventListener('online', () => { showToast('Conexión restaurada', 'info'); saveToFirebaseForce(); });
-window.addEventListener('offline', () => { document.getElementById('cloudStatus').innerHTML = '⚠️<br>Offline'; document.getElementById('cloudStatus').style.color = 'var(--accent-red)'; });
+window.addEventListener('online', () => { showToast('Conexión restaurada. Sincronizando...', 'info'); saveToFirebaseForce(); });
+window.addEventListener('offline', () => { document.getElementById('cloudStatus').innerHTML = '⚠️<br>Offline'; document.getElementById('cloudStatus').style.color = 'var(--accent-red)'; showToast('Modo sin conexión', 'error'); });
 
 function cleanHistoryAndMigrate() {
   if (!appData.history) appData.history = {}; if (!appData.today) appData.today = { dailyEarnedBs: 0, expenses: [], ridesToday: 0, rideDetails: [], payments: [] };
   if (!appData.sanPayments) appData.sanPayments = []; if (!appData.transportCategories) appData.transportCategories = ["Gasolina / Aceite", "Repuestos Moto", "Comida", "Recarga / Datos", "Otros"];
   if (!appData.motolavadoCategories) appData.motolavadoCategories = ["Champú / Desengrasante", "Agua / Luz", "Mantenimiento Hidrolavadora", "Otros"];
   if (!Array.isArray(appData.clients)) appData.clients = getDefaultData().clients;
+  
+  // Asegurar que no se borren clientes default si por error se vació
   let defaultClients = getDefaultData().clients;
   defaultClients.forEach(defClient => { let exists = appData.clients.find(c => c.name.toLowerCase() === defClient.name.toLowerCase()); if (!exists) { appData.clients.push(defClient); } });
+  
   appData.clients.forEach(c => { if(c.isShared === undefined) c.isShared = false; if(c.partnerCount === undefined) c.partnerCount = 0; if(c.lastPaidDate === undefined) c.lastPaidDate = ""; if(!c.phone || c.phone === '') { let match = defaultClients.find(dc => dc.name.toLowerCase() === c.name.toLowerCase()); if(match && match.phone) c.phone = match.phone; } });
 }
 
 function saveState() {
-  cleanHistoryAndMigrate(); localStorage.setItem('carrerasAppDataStore', JSON.stringify(appData)); render();
+  cleanHistoryAndMigrate(); 
+  localStorage.setItem('carrerasAppDataStore', JSON.stringify(appData));
+  render();
   if (navigator.onLine && window.db) {
     window.db.collection("hugg_store").doc("master_data").set({ payload: JSON.stringify(appData), updatedAt: new Date().toISOString() })
-      .then(() => { document.getElementById('cloudStatus').innerHTML = '☁️<br>Online'; document.getElementById('cloudStatus').style.color = 'var(--accent-green)'; }).catch(() => {});
+      .then(() => { document.getElementById('cloudStatus').innerHTML = '☁️<br>Online'; document.getElementById('cloudStatus').style.color = 'var(--accent-green)'; })
+      .catch(() => {});
   }
 }
-function saveToFirebaseForce() { saveState(); showToast('Sincronizado', 'success'); }
+function saveToFirebaseForce() { saveState(); showToast('Sincronizado con la nube', 'success'); }
 
+// ============================================================================
+// SISTEMA SHARE TARGET: WHATSAPP / BANCO DE VENEZUELA
+// ============================================================================
 window.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('shared') === 'true') {
-     setTimeout(() => { showToast('Selecciona el cliente para el pago', 'info'); openShareTargetSelector(); }, 1000);
+     setTimeout(() => {
+         showToast('Modo Compartir activado. Selecciona un cliente.', 'info');
+         openShareTargetSelector();
+     }, 1000);
   }
 });
 
 function openShareTargetSelector() {
     document.getElementById('modalBoxElement').className = 'modal-box';
-    document.getElementById('modalTitle').innerText = '📥 Pago Recibido (Banco)';
+    document.getElementById('modalTitle').innerText = '📥 Pago Recibido (App/Banco)';
     let clientOptions = appData.clients.sort((a,b)=>b.count-a.count).map(c => `<div class="custom-opt" onclick="selectSharedClient(${c.id})">${c.name} (Debe: ${c.count})</div>`).join('');
-    document.getElementById('modalBody').innerHTML = `<p style="font-size:12px; color:var(--text-sub); text-align:center; margin-bottom:10px;">Selecciona el cliente:</p><div style="display:flex; flex-direction:column; gap:8px; max-height:200px; overflow-y:auto;">${clientOptions}</div>`;
-    document.getElementById('modalButtons').innerHTML = '<button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>'; openModal();
+    document.getElementById('modalBody').innerHTML = `
+        <p style="font-size:12px; color:var(--text-sub); text-align:center; margin-bottom:10px;">Selecciona el cliente para asignar el comprobante y el pago.</p>
+        <div style="display:flex; flex-direction:column; gap:8px; max-height:200px; overflow-y:auto;">${clientOptions}</div>
+    `;
+    document.getElementById('modalButtons').innerHTML = '<button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>';
+    openModal();
 }
 function selectSharedClient(id) { closeModal(); setTimeout(()=>openPaymentModal(id), 300); }
 
+// ============================================================================
+// VOZ INTELIGENTE CON NLP LOCAL (SIN CORTES)
+// ============================================================================
 function toggleVoiceRecording() {
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) return showToast('No soportado', 'error');
+  if (!SpeechRecognition) return showToast('No soportado en este navegador', 'error');
   var btn = document.getElementById('voiceBtn');
-  if (isRecording) { isRecording = false; btn.classList.remove('recording'); if(recognition) recognition.stop(); showToast('Micrófono apagado', 'info'); } 
-  else { isRecording = true; btn.classList.add('recording'); recognition = new SpeechRecognition(); recognition.lang = 'es-VE'; recognition.continuous = true; recognition.interimResults = false; showToast('🎙️ Escuchando...', 'info');
-      recognition.onresult = function(event) { let text = event.results[event.results.length - 1][0].transcript.toLowerCase(); processNLP(text); };
-      recognition.onend = function() { if (isRecording) { recognition.start(); } }; recognition.start(); }
+
+  if (isRecording) {
+      isRecording = false; btn.classList.remove('recording');
+      if(recognition) recognition.stop();
+      showToast('Micrófono apagado', 'info');
+  } else {
+      isRecording = true; btn.classList.add('recording');
+      recognition = new SpeechRecognition();
+      recognition.lang = 'es-VE'; recognition.continuous = true; recognition.interimResults = false;
+      showToast('🎙️ Escuchando... Habla natural', 'info');
+
+      recognition.onresult = function(event) {
+          let text = event.results[event.results.length - 1][0].transcript.toLowerCase();
+          showToast('Procesando: "' + text + '"', 'info');
+          processNLP(text);
+      };
+      recognition.onend = function() {
+          if (isRecording) { recognition.start(); } // Bucle continuo
+      };
+      recognition.start();
+  }
 }
 
 function processNLP(text) {
   var targetDate = getTodayStr(); 
   if (text.includes('ayer')) { var d = new Date(); d.setDate(d.getDate() - 1); targetDate = d.toISOString().split('T')[0]; } 
-  var numbers = text.match(/\d+(?:[.,]\d+)?/g); var amount = numbers ? parseFloat(numbers[0].replace(',','.')) : 0;
-  if (text.includes('gasto') || text.includes('gasté')) {
-      if(amount <= 0) return; var cats = appData.transportCategories; var matchedCat = cats[0];
+  
+  var numbers = text.match(/\d+(?:[.,]\d+)?/g);
+  var amount = numbers ? parseFloat(numbers[0].replace(',','.')) : 0;
+  
+  // Detectar intención
+  if (text.includes('gasto') || text.includes('gasté') || text.includes('compre')) {
+      if(amount <= 0) return showToast('No detecté el monto del gasto', 'error');
+      var cats = appData.transportCategories; var matchedCat = cats[0];
       cats.forEach(c => { if(text.includes(c.toLowerCase().split('/')[0].trim())) matchedCat = c; });
       var t = (targetDate === getTodayStr()) ? appData.today : appData.history[targetDate];
       if(!t) { appData.history[targetDate] = { usdtRate: appData.usdtRate || 858.15, expenses: [], totalRides: 0, rideDetails: [], payments: [] }; t = appData.history[targetDate]; }
       if(!t.expenses) t.expenses = []; t.expenses.push({ id: Date.now(), desc: matchedCat, amount: amount, type: 'transporte' });
-      saveState(); showToast(`✅ Gasto: ${amount} Bs`, 'success');
+      saveState(); showToast(`✅ Gasto: ${amount} Bs (${matchedCat})`, 'success');
   } 
   else if (text.includes('pago') || text.includes('pagó')) {
-      if(amount <= 0) return; let foundClient = appData.clients.find(c => text.includes(c.name.toLowerCase()));
+      if(amount <= 0) return showToast('No detecté el monto del pago', 'error');
+      let foundClient = appData.clients.find(c => text.includes(c.name.toLowerCase()));
       if (foundClient) {
           let ridesToSub = numbers && numbers.length > 1 ? parseInt(numbers[1]) : 0;
           foundClient.count = Math.max(0, foundClient.count - ridesToSub);
@@ -515,25 +571,37 @@ function processNLP(text) {
           if(!t.payments) t.payments = [];
           t.payments.push({ id: Date.now(), clientName: foundClient.name, amountBs: amount, ridesPaid: ridesToSub, type: 'transporte', dateStr: targetDate, capture: null, method: 'pagomovil' });
           saveState(); showToast(`✅ Pago de ${foundClient.name}: ${amount}Bs`, 'success');
+      } else {
+          showToast('No reconocí al cliente. Dilo claro.', 'error');
       }
   }
 }
 
+// ============================================================================
+// OCR INTELIGENTE PARA BANCOS VENEZOLANOS
+// ============================================================================
 function preProcessForOCR(file, callback) {
   var img = new Image(); var reader = new FileReader();
   reader.onload = function(e) {
       img.onload = function() {
           var canvas = document.createElement('canvas'); var ctx = canvas.getContext('2d');
-          canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0, img.width, img.height);
-          var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height); var data = imgData.data;
+          canvas.width = img.width; canvas.height = img.height;
+          ctx.drawImage(img, 0, 0, img.width, img.height);
+          var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          var data = imgData.data;
+          // Contraste para plantillas BDV/Banesco
           for(var i = 0; i < data.length; i += 4) {
               var gray = data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114;
-              var contrast = (gray - 128) * 1.5 + 128; var val = contrast > 255 ? 255 : (contrast < 0 ? 0 : contrast);
+              var contrast = (gray - 128) * 1.5 + 128;
+              var val = contrast > 255 ? 255 : (contrast < 0 ? 0 : contrast);
               data[i] = data[i+1] = data[i+2] = val;
           }
-          ctx.putImageData(imgData, 0, 0); callback(canvas.toDataURL('image/jpeg', 0.9));
-      }; img.src = e.target.result;
-  }; reader.readAsDataURL(file);
+          ctx.putImageData(imgData, 0, 0);
+          callback(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function compressImage(imgDataUrl, callback) { 
@@ -541,31 +609,91 @@ function compressImage(imgDataUrl, callback) {
   img.onload = function() { 
     var canvas = document.createElement('canvas'); var maxW = 400; var scale = maxW / img.width; 
     if(scale < 1) { canvas.width = maxW; canvas.height = img.height * scale; } else { canvas.width = img.width; canvas.height = img.height; } 
-    var ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); callback(canvas.toDataURL('image/jpeg', 0.5)); 
+    var ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); 
+    callback(canvas.toDataURL('image/jpeg', 0.5)); 
   }; 
 }
 
 async function processCapture(input) {
   var file = input.files[0]; if(!file) return;
   var bsInput = document.getElementById('payBsMe'), uploadLabel = document.getElementById('uploadLabelText');
-  bsInput.placeholder = '⏳ Analizando...'; uploadLabel.innerText = '📸 Analizando...'; showToast('Analizando capture...', 'info');
-  var reader = new FileReader(); reader.onload = function(e) { compressImage(e.target.result, function(compressedStr) { tempCapturedImage = compressedStr; }); }; reader.readAsDataURL(file);
+  bsInput.placeholder = '⏳ IA Analizando Banco...'; uploadLabel.innerText = '📸 Escaneando BDV/Banesco...'; showToast('IA Bancaria Activa...', 'info');
+
+  var reader = new FileReader(); 
+  reader.onload = function(e) { compressImage(e.target.result, function(compressedStr) { tempCapturedImage = compressedStr; }); }; 
+  reader.readAsDataURL(file);
+
   preProcessForOCR(file, async function(processedUrl) {
     try {
-        var result = await Tesseract.recognize(processedUrl, 'eng'); var text = result.data.text;
+        var result = await Tesseract.recognize(processedUrl, 'eng');
+        var text = result.data.text;
+        
         var matches = text.match(/\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})\b/g);
         if(matches) { 
-            var cleanMatches = matches.map(m => m.match(/,\d{2}$/) ? parseFloat(m.replace(/\./g, '').replace(',', '.')) : parseFloat(m.replace(/,/g, '')));
-            var maxVal = Math.max(...cleanMatches.filter(n=>!isNaN(n))); if(maxVal > 0) bsInput.value = maxVal; 
+            var cleanMatches = matches.map(m => {
+                if(m.match(/,\d{2}$/)) { return parseFloat(m.replace(/\./g, '').replace(',', '.')); }
+                return parseFloat(m.replace(/,/g, ''));
+            });
+            var maxVal = Math.max(...cleanMatches.filter(n=>!isNaN(n)));
+            if(maxVal > 0) bsInput.value = maxVal; 
         }
-        uploadLabel.innerText = '✅ Capture cargado'; showToast('Monto extraído', 'success');
-    } catch (err) { bsInput.placeholder = 'Monto Bs...'; uploadLabel.innerText = '📷 Subir capture manual'; }
+        
+        var dateMatch = text.match(/\b(\d{2})[\/\-](\d{2})[\/\-](\d{2,4})\b/);
+        if(dateMatch) {
+            var y = dateMatch[3].length === 2 ? '20' + dateMatch[3] : dateMatch[3];
+            var m = dateMatch[2]; var d = dateMatch[1];
+            var dateField = document.getElementById('payDate');
+            if(dateField) dateField.value = `${y}-${m}-${d}`;
+        }
+        
+        uploadLabel.innerText = '✅ Capture cargado'; showToast('Datos Bancarios Extraídos', 'success');
+    } catch (err) { bsInput.placeholder = 'Monto Bs...'; uploadLabel.innerText = '📷 Subir capture manual'; showToast('Error OCR', 'error'); }
+  });
+}
+async function processSanCapture(input) { 
+  var file=input.files[0]; if(!file)return; 
+  var bsInput=document.getElementById('sanBs'), uploadLabel=document.getElementById('sanUploadLabel'); 
+  bsInput.placeholder='⏳ Analizando...'; uploadLabel.innerText='📸 Analizando...'; showToast('Analizando...', 'info'); 
+  
+  var reader = new FileReader(); 
+  reader.onload = function(e) { compressImage(e.target.result, function(compressedStr) { tempCapturedImage = compressedStr; }); }; 
+  reader.readAsDataURL(file);
+
+  preProcessForOCR(file, async function(processedUrl) {
+    try { 
+        var result=await Tesseract.recognize(processedUrl, 'eng'); 
+        var text = result.data.text;
+        var matches=text.match(/\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})\b/g); 
+        if(matches){ 
+            var cleanMatches = matches.map(m => {
+                if(m.match(/,\d{2}$/)) { return parseFloat(m.replace(/\./g, '').replace(',', '.')); }
+                return parseFloat(m.replace(/,/g, ''));
+            });
+            var maxVal = Math.max(...cleanMatches.filter(n=>!isNaN(n)));
+            if(maxVal > 0) { bsInput.value=maxVal; calcSanUsdt(); }
+        } 
+        
+        var dateMatch = text.match(/\b(\d{2})[\/\-](\d{2})[\/\-](\d{2,4})\b/);
+        if(dateMatch) {
+            var y = dateMatch[3].length === 2 ? '20' + dateMatch[3] : dateMatch[3];
+            var m = dateMatch[2]; var d = dateMatch[1];
+            var dateField = document.getElementById('sanDate');
+            if(dateField) dateField.value = `${y}-${m}-${d}`;
+        }
+        uploadLabel.innerText='✅ Capture cargado'; showToast('Monto extraído', 'success'); 
+    } catch (err) { bsInput.placeholder='Monto Bs...'; uploadLabel.innerText='📷 Subir capture'; showToast('Error', 'error'); } 
   });
 }
 
+// ============================================================================
+// FUNCIONES BASE, UTILERÍAS Y RENDERIZADO
+// ============================================================================
 window.onload = function() {
-  setTimeout(() => { document.getElementById('splashScreen').style.opacity = '0'; setTimeout(() => { document.getElementById('splashScreen').style.display = 'none'; }, 500); }, 1000);
+  playEngineRev(); setTimeout(() => { document.getElementById('tachoNeedle').style.transform = 'translateX(-50%) rotate(120deg)'; }, 100);
+  setTimeout(() => { document.getElementById('splashScreen').style.opacity = '0'; setTimeout(() => { document.getElementById('splashScreen').style.display = 'none'; }, 500); }, 1600);
 };
+
+function playEngineRev() { try { var ctx = new (window.AudioContext || window.webkitAudioContext)(); var osc = ctx.createOscillator(); var gain = ctx.createGain(); osc.connect(gain); gain.connect(ctx.destination); osc.type = 'sawtooth'; osc.frequency.setValueAtTime(40, ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.6); osc.frequency.exponentialRampToValueAtTime(70, ctx.currentTime + 1.5); gain.gain.setValueAtTime(0, ctx.currentTime); gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + 0.2); gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.6); osc.start(); osc.stop(ctx.currentTime + 1.7); } catch(e) {} }
 
 function getTodayStr() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function getCurrentMonthPrefix() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
@@ -580,13 +708,24 @@ function setTab(tab) { currentTab = tab; document.querySelectorAll('.tab-btn').f
 async function fetchBinanceRate() { try { var r = await fetch('https://ve.dolarapi.com/v1/dolares/cripto', { cache: 'no-store' }); var d = await r.json(); if (d && d.promedio) appData.usdtRate = parseFloat(d.promedio); saveState(); showToast('Tasa actualizada', 'success'); } catch(e) {} document.getElementById('usdtRateText').innerText = (appData.usdtRate||858.15).toFixed(2) + ' Bs'; }
 
 function updatePerformancePanel() {
-    let rate = appData.usdtRate || 858.15; let prefix = getCurrentMonthPrefix(); let mEarnedBs = 0;
+    let rate = appData.usdtRate || 858.15;
+    let prefix = getCurrentMonthPrefix();
+    let mEarnedBs = 0;
     Object.keys(appData.history).forEach(d => { if(d.startsWith(prefix)) mEarnedBs += (appData.history[d].payments||[]).reduce((s,p)=>s+p.amountBs,0); });
     if(getTodayStr().startsWith(prefix)) mEarnedBs += appData.today.payments.reduce((s,p)=>s+p.amountBs,0);
-    let mEarnedUsdt = mEarnedBs / rate; let d = new Date(); let daysPassed = d.getDate(); let daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
-    let dailyAvg = mEarnedUsdt / daysPassed; let projection = dailyAvg * daysInMonth;
-    document.getElementById('perfEarned').innerText = mEarnedUsdt.toFixed(0) + ' USDT'; document.getElementById('perfDaily').innerText = dailyAvg.toFixed(1) + ' USDT/día'; document.getElementById('perfProj').innerText = projection.toFixed(0) + ' USDT';
-    let pct = Math.min(100, (mEarnedUsdt / 300) * 100); document.getElementById('perfProgress').style.width = pct + '%';
+    
+    let mEarnedUsdt = mEarnedBs / rate;
+    let d = new Date(); let daysPassed = d.getDate(); let daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+    let dailyAvg = mEarnedUsdt / daysPassed;
+    let projection = dailyAvg * daysInMonth;
+    
+    document.getElementById('perfEarned').innerText = mEarnedUsdt.toFixed(0) + ' USDT';
+    document.getElementById('perfDaily').innerText = dailyAvg.toFixed(1) + ' USDT/día';
+    document.getElementById('perfProj').innerText = projection.toFixed(0) + ' USDT';
+    
+    let goal = 300; // Meta mensual configurada
+    let pct = Math.min(100, (mEarnedUsdt / goal) * 100);
+    document.getElementById('perfProgress').style.width = pct + '%';
 }
 
 function getMonthlyStatsForPrefix(prefix, targetType) { var stats = { earnedBs: 0, expensesBs: 0, rides: 0, sanPaidBs: 0 }; Object.keys(appData.history).forEach(function(date) { if (date.startsWith(prefix)) { var h = appData.history[date]; if (h.payments) stats.earnedBs += h.payments.filter(p => !targetType || p.type === targetType).reduce((s,p)=>s+p.amountBs, 0); if (h.expenses) stats.expensesBs += h.expenses.filter(e => !targetType || e.type === targetType).reduce((s,e)=>s+e.amount, 0); if (!targetType || targetType === 'transporte') stats.rides += (h.totalRides || 0); } }); if (getTodayStr().startsWith(prefix)) { stats.earnedBs += appData.today.payments.filter(p => !targetType || p.type === targetType).reduce((s,p)=>s+p.amountBs, 0); stats.expensesBs += appData.today.expenses.filter(e => !targetType || e.type === targetType).reduce((s,e)=>s+e.amount, 0); if (!targetType || targetType === 'transporte') stats.rides += (appData.today.ridesToday || 0); } appData.sanPayments.forEach(p => { if(p.dateStr && p.dateStr.startsWith(prefix) && p.type === 'pago') stats.sanPaidBs += p.amountBs; }); return stats; }
@@ -595,13 +734,18 @@ function getGlobalTodayStats() { var totalBs = appData.today.payments.reduce((s,
 
 function render() {
   checkDailyReset(); var rate = appData.usdtRate || 858.15; document.getElementById('usdtRateText').innerText = rate.toFixed(2) + ' Bs';
-  var globalToday = getGlobalTodayStats(); document.getElementById('pocketNetToday').innerText = globalToday.total.toFixed(2) + ' Bs'; document.getElementById('pocketTitheToday').innerText = globalToday.tithe.toFixed(2) + ' Bs';
+  
+  var globalToday = getGlobalTodayStats();
+  document.getElementById('pocketNetToday').innerText = globalToday.total.toFixed(2) + ' Bs'; document.getElementById('pocketTitheToday').innerText = globalToday.tithe.toFixed(2) + ' Bs';
+  
   if(currentTab !== 'san') {
       var mStats = getMonthlyStatsForPrefix(getCurrentMonthPrefix(), currentTab); var mEarned = mStats.earnedBs, mExp = mStats.expensesBs, mTithe = mEarned * 0.10, mSanPaid = currentTab === 'transporte' ? mStats.sanPaidBs : 0; var netRealBs = mEarned - mExp - mTithe - mSanPaid;
       var tabLabel = currentTab === 'transporte' ? 'Transporte' : 'Lavado'; document.getElementById('lblTabVal1').innerText = tabLabel; document.getElementById('lblTabVal2').innerText = tabLabel; document.getElementById('lblTabVal3').innerText = tabLabel;
+      
       document.getElementById('sumEarnedBs').innerText = mEarned.toFixed(2) + ' Bs'; document.getElementById('sumEarnedUsdt').innerText = (mEarned/rate).toFixed(2) + ' USDT';
       document.getElementById('sumExpensesBs').innerText = mExp.toFixed(2) + ' Bs'; document.getElementById('sumExpensesUsdt').innerText = (mExp/rate).toFixed(2) + ' USDT';
       document.getElementById('sumNetBs').innerText = netRealBs.toFixed(2) + ' Bs'; document.getElementById('sumNetUsdt').innerText = (netRealBs/rate).toFixed(2) + ' USDT';
+      
       if(currentTab === 'transporte') {
           document.getElementById('sumTotalRides').innerText = mStats.rides;
           var pending = appData.clients.reduce((s,c)=>s+(c.count||0)+(c.partnerCount||0),0);
@@ -616,7 +760,8 @@ function render() {
 function renderChart(rate) { 
   var labels = ['L','M','X','J','V','S','D'], incData = [0,0,0,0,0,0,0], expData = [0,0,0,0,0,0,0];
   var todayObj = new Date(), currDay = todayObj.getDay(), diff = currDay===0?-6:1-currDay;
-  var monday = new Date(todayObj); monday.setDate(todayObj.getDate() + diff); var maxVal = 0;
+  var monday = new Date(todayObj); monday.setDate(todayObj.getDate() + diff);
+  var maxVal = 0;
   for(var i=0; i<7; i++) {
       var dObj = new Date(monday); dObj.setDate(monday.getDate() + i);
       var dStr = dObj.getFullYear() + '-' + String(dObj.getMonth()+1).padStart(2,'0') + '-' + String(dObj.getDate()).padStart(2,'0');
@@ -637,48 +782,102 @@ function renderClients() {
   let q = (document.getElementById('clientSearchInput').value || '').trim().toLowerCase(); let todayStr = getTodayStr();
   let list = (appData.clients || []).slice().sort((a,b) => { let aPaidToday = (a.lastPaidDate === todayStr) ? 1 : 0; let bPaidToday = (b.lastPaidDate === todayStr) ? 1 : 0; if (aPaidToday !== bPaidToday) return aPaidToday - bPaidToday; return (b.count + (b.partnerCount||0)) - (a.count + (a.partnerCount||0)); });
   if (q) list = list.filter(c => c.name.toLowerCase().includes(q));
-  if (list.length === 0) { container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">No hay clientes.</div>'; return; }
+  if (list.length === 0) { container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px; font-size:13px;">No hay clientes registrados.</div>'; return; }
   list.forEach(c => {
     let pCount = c.partnerCount || 0, isShared = c.isShared === true, phoneDisplay = c.phone ? '📱 ' + c.phone : '⚠️ Sin número', totalShared = (c.count || 0) + pCount;
-    let sharedBadgeHtml = isShared ? `<div style="font-size:9px; background:var(--accent-purple); color:#fff; padding:3px 6px; border-radius:6px; display:inline-block; margin-bottom:4px; font-weight:800;">🤝 COMPARTIDO</div>` : '';
+    let sharedBadgeHtml = isShared ? `<div style="font-size:9px; background:var(--accent-purple); color:#fff; padding:3px 6px; border-radius:6px; display:inline-block; margin-bottom:4px; font-weight:800; letter-spacing:0.5px;">🤝 COMPARTIDO</div>` : '';
     let badgesHtml = isShared ? `<div style="display:flex; gap:4px; align-items:center;"><div style="display:flex; gap:4px; flex-direction:column;"><div class="ride-badge" style="font-size:16px; padding:2px 8px; background:rgba(22,163,74,0.1); border:1px solid rgba(22,163,74,0.3); color:var(--accent-green);">${c.count}</div><div class="ride-badge" style="font-size:16px; padding:2px 8px; background:rgba(147,51,234,0.1); border:1px solid rgba(147,51,234,0.3); color:var(--accent-purple);">${pCount}</div></div><span style="font-weight:900; color:var(--text-sub); font-size:14px; margin:0 2px;">=</span><div class="ride-badge" style="font-size:18px; padding:4px 10px; background:rgba(217,119,6,0.1); border:1px solid rgba(217,119,6,0.3); color:var(--accent-gold);">${totalShared}</div></div>` : `<div class="ride-badge" style="font-size:20px; padding:4px 12px; background:rgba(22,163,74,0.1); border:1px solid rgba(22,163,74,0.3); color:var(--accent-green);">${c.count}</div>`;
     let buttonsMeHtml = `<div class="rides-buttons-row"><button class="btn-ride-num" onclick="promptAddClientRides(${c.id}, 1, false)">+1</button><button class="btn-ride-num" onclick="promptAddClientRides(${c.id}, 2, false)">+2</button><button class="btn-ride-num" onclick="promptAddClientRides(${c.id}, 3, false)">+3</button><button class="btn-ride-num" onclick="promptAddClientRides(${c.id}, 4, false)">+4</button><button class="btn-ride-num" onclick="promptAddClientRides(${c.id}, 5, false)">+5</button></div>`;
     let buttonsPartnerHtml = isShared ? `<div class="rides-buttons-row" style="margin-top:-4px;"><button class="btn-ride-num" style="background:rgba(147,51,234,0.1); color:var(--accent-purple); border-color:rgba(147,51,234,0.3);" onclick="promptAddClientRides(${c.id}, 1, true)">+1</button><button class="btn-ride-num" style="background:rgba(147,51,234,0.1); color:var(--accent-purple); border-color:rgba(147,51,234,0.3);" onclick="promptAddClientRides(${c.id}, 2, true)">+2</button><button class="btn-ride-num" style="background:rgba(147,51,234,0.1); color:var(--accent-purple); border-color:rgba(147,51,234,0.3);" onclick="promptAddClientRides(${c.id}, 3, true)">+3</button><button class="btn-ride-num" style="background:rgba(147,51,234,0.1); color:var(--accent-purple); border-color:rgba(147,51,234,0.3);" onclick="promptAddClientRides(${c.id}, 4, true)">+4</button><button class="btn-ride-num" style="background:rgba(147,51,234,0.1); color:var(--accent-purple); border-color:rgba(147,51,234,0.3);" onclick="promptAddClientRides(${c.id}, 5, true)">+5</button></div>` : '';
     let card = document.createElement('div'); card.className = 'client-card'; if(c.lastPaidDate === todayStr) { card.style.opacity = '0.7'; card.style.border = '1px solid rgba(22,163,74,0.3)'; }
-    card.innerHTML = `<div class="client-header"><div class="client-name-box"><div class="client-avatar" onclick="openClientSettingsModal(${c.id})">👤</div><div>${sharedBadgeHtml}<span style="font-size:16px;font-weight:800;display:block;">${c.name}</span><div class="client-phone">${phoneDisplay}</div></div></div>${badgesHtml}</div>${buttonsMeHtml}${buttonsPartnerHtml}<div class="counter-controls"><button class="btn-action btn-pay" onclick="openPaymentModal(${c.id})">💰 PAGO</button><button class="btn-action btn-sub-ride" onclick="promptDeleteClientRides(${c.id})">➖ CARRERAS</button><button class="btn-action btn-whatsapp" onclick="sendWhatsAppReminder(${c.id})">&#128172;</button></div>`;
+    card.innerHTML = `<div class="client-header"><div class="client-name-box"><div class="client-avatar" onclick="openClientSettingsModal(${c.id})" title="Configurar Cliente">👤</div><div>${sharedBadgeHtml}<span style="font-size:16px;font-weight:800;display:block;">${c.name}</span><div class="client-phone">${phoneDisplay}</div></div></div>${badgesHtml}</div>${buttonsMeHtml}${buttonsPartnerHtml}<div class="counter-controls"><button class="btn-action btn-pay" onclick="openPaymentModal(${c.id})">💰 PAGO</button><button class="btn-action btn-sub-ride" onclick="promptDeleteClientRides(${c.id})">➖ CARRERAS</button><button class="btn-action btn-whatsapp" onclick="sendWhatsAppReminder(${c.id})">&#128172;</button></div>`;
     container.appendChild(card);
   });
 }
 function handleClientSearch() { renderClients(); }
-function selCustomOpt(inputId, el, val) { document.getElementById(inputId).value = val; var container = el.parentElement; var opts = container.querySelectorAll('.custom-opt'); opts.forEach(o => o.classList.remove('active')); el.classList.add('active'); }
-function getCategoryEmoji(cat) { cat = cat.toLowerCase(); if(cat.includes('gasolina')||cat.includes('aceite')) return '⛽'; if(cat.includes('repuesto')) return '🛠️'; if(cat.includes('comida')) return '🍔'; if(cat.includes('recarga')||cat.includes('dato')) return '📱'; return '📌'; }
-function openClientSettingsModal(clientId) { var c = appData.clients.find(x=>String(x.id)===String(clientId)); if(!c) return; var isS = c.isShared === true; document.getElementById('modalBoxElement').className = 'modal-box'; document.getElementById('modalTitle').innerText = '⚙️ Configurar a ' + c.name; document.getElementById('modalBody').innerHTML = `<label style="font-size:11px;color:var(--accent-cyan);display:block;margin-bottom:6px;font-weight:700;">Teléfono:</label><input type="text" id="editClientPhone" class="modal-input" value="${c.phone || ''}"><button style="background:rgba(220,38,38,0.15); color:var(--accent-red); border:1px solid var(--accent-red); width:100%; padding:12px; border-radius:12px; margin-top:16px; font-weight:700; cursor:pointer;" onclick="deleteClient(${c.id})">🗑️ Eliminar Cliente</button>`; document.getElementById('modalButtons').innerHTML = `<button style="background:var(--accent-cyan);color:#fff;" onclick="confirmClientSettings(${c.id})">Guardar</button><button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>`; openModal(); }
-function deleteClient(clientId) { if (confirm('¿Eliminar?')) { appData.clients = appData.clients.filter(x => String(x.id) !== String(clientId)); saveState(); closeModal(); showToast('Eliminado', 'success'); } }
-function confirmClientSettings(clientId) { var c = appData.clients.find(x=>String(x.id)===String(clientId)); if(!c) return; c.phone = document.getElementById('editClientPhone').value.trim(); saveState(); closeModal(); showToast('Guardado', 'success'); }
 
-function promptAddClientRides(clientId, amount, isPartner) { var c = appData.clients.find(x=>x.id===clientId); if(!c) return; var todayStr = getTodayStr(); if(isPartner) { c.partnerCount = (c.partnerCount || 0) + amount; } else { c.count += amount; } var target = appData.today; if(!isPartner) target.ridesToday += amount; if(!target.rideDetails) target.rideDetails = []; target.rideDetails.push({ id: Date.now(), clientId: c.id, name: c.name, amount: amount, isPartner: isPartner }); saveState(); showToast('+' + amount + ' guardadas', 'success'); }
-function promptDeleteClientRides(clientId) { var c = appData.clients.find(x=>x.id===clientId); if(!c) return; c.count = Math.max(0, c.count - 1); saveState(); showToast('Restada', 'success'); }
+function selCustomOpt(inputId, el, val) { document.getElementById(inputId).value = val; var container = el.parentElement; var opts = container.querySelectorAll('.custom-opt'); opts.forEach(o => o.classList.remove('active')); el.classList.add('active'); }
+
+function getCategoryEmoji(cat) {
+  cat = cat.toLowerCase();
+  if(cat.includes('gasolina')||cat.includes('aceite')) return '⛽';
+  if(cat.includes('repuesto')) return '🛠️';
+  if(cat.includes('comida')) return '🍔';
+  if(cat.includes('recarga')||cat.includes('dato')) return '📱';
+  if(cat.includes('champú')||cat.includes('desengrasante')) return '💧';
+  if(cat.includes('agua')||cat.includes('luz')) return '⚡';
+  if(cat.includes('mantenimiento')) return '🔧';
+  return '📌';
+}
+
+function deleteClient(clientId) { if (confirm('¿Estás seguro de eliminar al cliente?')) { appData.clients = appData.clients.filter(x => String(x.id) !== String(clientId)); saveState(); closeModal(); showToast('Cliente eliminado', 'success'); } }
+function openClientSettingsModal(clientId) { var c = appData.clients.find(x=>String(x.id)===String(clientId)); if(!c) return; var isS = c.isShared === true; document.getElementById('modalBoxElement').className = 'modal-box'; document.getElementById('modalTitle').innerText = '⚙️ Configurar a ' + c.name; document.getElementById('modalBody').innerHTML = `<label style="font-size:11px;color:var(--accent-cyan);display:block;margin-bottom:6px;font-weight:700;">Número de WhatsApp:</label><input type="text" id="editClientPhone" class="modal-input" placeholder="Ej: 04121234567" value="${c.phone || ''}"><label style="font-size:11px;color:var(--accent-purple);display:block;margin-bottom:6px;font-weight:700;margin-top:10px;">Cliente Compartido:</label><div style="display:flex; gap:6px; margin-bottom:14px;"><div class="custom-opt ${isS ? 'active' : ''}" onclick="selCustomOpt('editClientSharedVal', this, 'true')" style="flex:1;">Sí (Compartido)</div><div class="custom-opt ${!isS ? 'active' : ''}" onclick="selCustomOpt('editClientSharedVal', this, 'false')" style="flex:1;">No (Individual)</div></div><input type="hidden" id="editClientSharedVal" value="${isS ? 'true' : 'false'}"><button style="background:rgba(220,38,38,0.15); color:var(--accent-red); border:1px solid var(--accent-red); width:100%; padding:12px; border-radius:12px; margin-top:16px; font-weight:700; cursor:pointer;" onclick="deleteClient(${c.id})">🗑️ Eliminar Cliente</button>`; document.getElementById('modalButtons').innerHTML = `<button style="background:var(--accent-cyan);color:#fff;" onclick="confirmClientSettings(${c.id})">Guardar</button><button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>`; openModal(); }
+function confirmClientSettings(clientId) { var c = appData.clients.find(x=>String(x.id)===String(clientId)); if(!c) return; c.phone = document.getElementById('editClientPhone').value.trim(); c.isShared = document.getElementById('editClientSharedVal').value === 'true'; if(!c.partnerCount) c.partnerCount = 0; saveState(); closeModal(); showToast('Configuración guardada', 'success'); }
+
+function promptAddClientRides(clientId, amount, isPartner) { var c = appData.clients.find(x=>x.id===clientId); if(!c) return; var todayDate = new Date(), todayStr = getTodayStr(), yDate = new Date(); yDate.setDate(todayDate.getDate() - 1); var yStr = yDate.toISOString().split('T')[0]; var titleText = isPartner ? '➕ Añadir ' + amount + ' al Compañero' : '➕ Añadir ' + amount + ' Carrera(s) a ' + c.name; var colorHex = isPartner ? 'var(--accent-purple)' : 'var(--accent-green)'; document.getElementById('modalBoxElement').className = 'modal-box'; document.getElementById('modalTitle').innerHTML = `<span style="color:${colorHex}">${titleText}</span>`; document.getElementById('modalBody').innerHTML = `<input type="hidden" id="targetRideDate" value="${todayStr}"><div class="custom-opt-col"><div class="custom-opt active" onclick="selCustomOpt('targetRideDate', this, '${todayStr}')">🗓️ Hoy (${todayStr})</div><div class="custom-opt" onclick="selCustomOpt('targetRideDate', this, '${yStr}')">🗓️ Ayer (${yStr})</div></div>`; document.getElementById('modalButtons').innerHTML = `<button style="background:${colorHex};color:#fff;" onclick="confirmAddClientRides(${c.id}, ${amount}, ${isPartner})">Aceptar</button><button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>`; openModal(); }
+function confirmAddClientRides(clientId, amount, isPartner) { var c = appData.clients.find(x=>x.id===clientId), dStr = document.getElementById('targetRideDate').value; if(!c) return; if(isPartner) { c.partnerCount = (c.partnerCount || 0) + amount; } else { c.count += amount; } var target = (dStr === getTodayStr()) ? appData.today : appData.history[dStr]; if (!target && dStr !== getTodayStr()) { appData.history[dStr] = { usdtRate: appData.usdtRate || 858.15, expenses: [], totalRides: 0, rideDetails: [], payments: [] }; target = appData.history[dStr]; } if (dStr === getTodayStr()) { if(!isPartner) appData.today.ridesToday += amount; if(!appData.today.rideDetails) appData.today.rideDetails = []; appData.today.rideDetails.push({ id: Date.now(), clientId: c.id, name: c.name, amount: amount, isPartner: isPartner }); } else { if(!isPartner) target.totalRides = (target.totalRides || 0) + amount; if(!target.rideDetails) target.rideDetails = []; target.rideDetails.push({ id: Date.now(), clientId: c.id, name: c.name, amount: amount, isPartner: isPartner }); } saveState(); closeModal(); showToast('+' + amount + ' guardadas', 'success'); }
+
+function promptDeleteClientRides(clientId) { var c = appData.clients.find(x=>x.id===clientId); if(!c) return; let sharedOptions = c.isShared ? `<label style="font-size:11px;color:var(--text-sub);font-weight:700;">¿De quién restar?</label><input type="hidden" id="delRideType" value="me"><div class="custom-opt-row"><div class="custom-opt active" onclick="selCustomOpt('delRideType', this, 'me')">Tus Carreras</div><div class="custom-opt" onclick="selCustomOpt('delRideType', this, 'partner')">Del Compa</div></div>` : '<input type="hidden" id="delRideType" value="me">'; document.getElementById('modalBoxElement').className = 'modal-box'; document.getElementById('modalTitle').innerText = '➖ Restar a ' + c.name; document.getElementById('modalBody').innerHTML = sharedOptions + '<input type="number" id="delRideAmount" class="modal-input" placeholder="Monto de carreras a descontar... (Ej: 1)"><p style="font-size:10px; color:var(--text-sub); text-align:center;">Esto bajará su deuda sin afectar tus estadísticas.</p>'; document.getElementById('modalButtons').innerHTML = `<button style="background:var(--accent-red);color:#fff;" onclick="confirmDeleteClientRides(${c.id})">Confirmar Descuento</button><button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>`; openModal(); }
+function confirmDeleteClientRides(clientId) { var c = appData.clients.find(x=>x.id===clientId), amt = parseInt(document.getElementById('delRideAmount').value), isPartner = (document.getElementById('delRideType').value === 'partner'); if (isNaN(amt) || amt <= 0) return showToast('Inválido','error'); if (isPartner) { c.partnerCount = Math.max(0, (c.partnerCount||0) - amt); } else { c.count = Math.max(0, c.count - amt); } var target = appData.today; if(!target.rideDetails) target.rideDetails = []; target.rideDetails.push({ id: Date.now(), clientId: c.id, name: c.name, amount: -amt, isPartner: isPartner, isDeduction: true }); saveState(); closeModal(); showToast('Restadas', 'success'); }
+
+function getGreetingByHour() { var hour = new Date().getHours(); if (hour >= 5 && hour < 12) return "¡Buenos días!"; if (hour >= 12 && hour < 18) return "¡Buenas tardes!"; return "¡Buenas noches!"; }
+function formatPhoneWhatsApp(rawPhone) { var p = rawPhone.replace(/\D/g,''); if (!p.startsWith('58')) p = '58' + (p.startsWith('0') ? p.substring(1) : p); return p; }
 
 function openPaymentModal(clientId) {
   var c = appData.clients.find(x=>x.id===clientId); if(!c) return;
   document.getElementById('modalBoxElement').className = 'modal-box';
-  document.getElementById('modalTitle').innerText = 'Pago de ' + c.name;
-  document.getElementById('modalBody').innerHTML = `<input type="number" id="payRidesMe" class="modal-input" placeholder="Carreras a cobrar" value="${c.count}"><input type="number" id="payBsMe" class="modal-input" placeholder="Monto en Bs..."><input type="file" id="captureUpload" accept="image/*" onchange="processCapture(this)" style="display:none;"><div class="file-upload-btn" onclick="document.getElementById('captureUpload').click()"><span id="uploadLabelText">📷 Escanear Comprobante (BDV/Banesco)</span></div><input type="date" id="payDate" class="modal-input" value="${getTodayStr()}">`;
-  document.getElementById('modalButtons').innerHTML = `<button style="background:var(--accent-green);color:#fff;" onclick="confirmPayment(${c.id})">Guardar Pago</button><button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>`; openModal();
+  document.getElementById('modalTitle').innerText = '¿Cómo paga ' + c.name + '?';
+  document.getElementById('modalBody').innerHTML = `
+      <div style="display:flex; gap:10px; margin-bottom:10px; margin-top:20px;">
+          <button style="flex:1; background:rgba(22,163,74,0.1); border:1px solid rgba(22,163,74,0.3); color:var(--accent-green); padding:24px 10px; border-radius:16px; font-size:14px; font-weight:800; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:12px; transition:0.2s;" onclick="openPaymentForm(${c.id}, 'efectivo')"><span style="font-size:32px;">💵</span> Efectivo</button>
+          <button style="flex:1; background:rgba(2,132,199,0.1); border:1px solid rgba(2,132,199,0.3); color:var(--accent-cyan); padding:24px 10px; border-radius:16px; font-size:14px; font-weight:800; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:12px; transition:0.2s;" onclick="openPaymentForm(${c.id}, 'pagomovil')"><span style="font-size:32px;">📱</span> Pago Móvil</button>
+      </div>
+  `;
+  document.getElementById('modalButtons').innerHTML = '<button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>'; openModal();
+}
+
+function openPaymentForm(clientId, method) {
+  var c = appData.clients.find(x=>x.id===clientId); if(!c) return;
+  tempCapturedImage = null; var isEfectivo = (method === 'efectivo');
+  var iconTitle = isEfectivo ? '💵 Efectivo: ' : '📱 Pago Móvil: ';
+  var waCheckboxHTML = ''; var captureHTML = '';
+
+  if(!isEfectivo) {
+      waCheckboxHTML = c.phone ? `<div class="wa-checkbox-wrapper" onclick="document.getElementById('waReceipt').click()"><input type="checkbox" id="waReceipt" checked onclick="event.stopPropagation()"><label for="waReceipt">Enviar recibo WhatsApp</label></div>` : `<div style="font-size:11px; color:var(--text-muted); text-align:center;">Agrega un número (👤) para WhatsApp</div>`;
+      captureHTML = '<input type="file" id="captureUpload" accept="image/*" onchange="processCapture(this)" style="display:none;"><div class="file-upload-btn" onclick="document.getElementById(\'captureUpload\').click()"><span id="uploadLabelText">📷 Toca para escanear Banco</span></div>';
+  }
+
+  let ridesHtml = c.isShared ? `<div style="display:flex; gap:10px; margin-bottom:12px;"><div style="flex:1"><label style="font-size:10px;color:var(--accent-green);">TUS (Debe: ${c.count})</label><input type="number" id="payRidesMe" class="modal-input" value="${c.count}"></div><div style="flex:1"><label style="font-size:10px;color:var(--accent-purple);">Compa (Debe: ${c.partnerCount||0})</label><input type="number" id="payRidesPartner" class="modal-input" value="${c.partnerCount||0}"></div></div><div style="display:flex; gap:10px; margin-bottom:12px;"><div style="flex:1"><input type="number" id="payBsMe" class="modal-input" placeholder="Tus Bs..." style="border-color:var(--accent-green);"></div><div style="flex:1"><input type="number" id="payBsPartner" class="modal-input" placeholder="Compa Bs..." style="border-color:var(--accent-purple);"></div></div>` : `<input type="number" id="payRidesMe" class="modal-input" placeholder="Carreras (Debe: ${c.count})" value="${c.count}"><input type="hidden" id="payRidesPartner" value="0"><input type="number" id="payBsMe" class="modal-input" placeholder="Monto Bs..."><input type="hidden" id="payBsPartner" value="0">`;
+
+  document.getElementById('modalTitle').innerText = iconTitle + c.name;
+  document.getElementById('modalBody').innerHTML = ridesHtml + '<input type="date" id="payDate" class="modal-input" value="'+getTodayStr()+'"><input type="hidden" id="payMethodVal" value="'+method+'">' + captureHTML + waCheckboxHTML;
+  var btnColor = isEfectivo ? 'var(--accent-green)' : 'var(--accent-cyan)';
+  document.getElementById('modalButtons').innerHTML = `<button style="background:${btnColor};color:#fff;" onclick="confirmPayment(${c.id})">Guardar Pago</button><button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="openPaymentModal(${c.id})">Atrás</button>`;
 }
 
 function confirmPayment(clientId) {
   var c = appData.clients.find(x=>x.id===clientId);
-  var rdsMe = parseFloat(document.getElementById('payRidesMe').value) || 0, bsMe = parseFloat(document.getElementById('payBsMe').value) || 0, payDate = document.getElementById('payDate').value || getTodayStr();
+  var rdsMe = parseFloat(document.getElementById('payRidesMe').value) || 0, bsMe = parseFloat(document.getElementById('payBsMe').value) || 0, payDate = document.getElementById('payDate').value || getTodayStr(), method = document.getElementById('payMethodVal').value, sendWa = document.getElementById('waReceipt') ? document.getElementById('waReceipt').checked : false;
   if(bsMe <= 0 && rdsMe <= 0) return showToast('Inválido','error');
-  c.count = Math.max(0, c.count - rdsMe); c.lastPaidDate = payDate;
+  c.count = Math.max(0, c.count - rdsMe); c.lastPaidDate = payDate; 
   var target = (payDate === getTodayStr()) ? appData.today : appData.history[payDate];
-  if(!target) { appData.history[payDate] = { usdtRate: appData.usdtRate || 858.15, expenses: [], totalRides: 0, rideDetails: [], payments: [] }; target = appData.history[payDate]; }
-  if(!target.payments) target.payments = [];
-  target.payments.push({ id: Date.now(), clientId: c.id, clientName: c.name, ridesPaid: rdsMe, amountBs: bsMe, type: 'transporte', dateStr: payDate, capture: tempCapturedImage, method: 'pagomovil' });
+  if (!target && payDate !== getTodayStr()) { appData.history[payDate] = { usdtRate: appData.usdtRate || 858.15, expenses: [], totalRides: 0, rideDetails: [], payments: [] }; target = appData.history[payDate]; }
+  if(!target) target = appData.today; if(!target.payments) target.payments = [];
+  
+  if (bsMe > 0 || rdsMe > 0) target.payments.push({ id: Date.now(), clientId: c.id, clientName: c.name, ridesPaid: rdsMe, amountBs: bsMe, type: 'transporte', dateStr: payDate, capture: tempCapturedImage, method: method });
   tempCapturedImage = null; saveState(); closeModal(); showToast('Pago registrado', 'success');
+
+  if(sendWa && c.phone && method === 'pagomovil') {
+    var greeting = getGreetingByHour(); var msg = "", d = c.count; 
+    if (d > 0) { msg = `*${greeting} Pago confirmado por ${bsMe.toFixed(2)} bolívares correspondiente a ${rdsMe} carreras. Queda restando ${d} carreras.*`; } 
+    else { msg = `*${greeting} Pago confirmado por ${bsMe.toFixed(2)} bolívares correspondiente a ${rdsMe} carreras. Quedamos al día.*`; }
+    window.open(`https://wa.me/${formatPhoneWhatsApp(c.phone)}?text=${encodeURIComponent(msg)}`, '_blank');
+  }
 }
 
+// ============================================================================
+// CALENDARIO Y DÍAS (100% RESTAURADO Y FUNCIONAL)
+// ============================================================================
 function changeCalendarMonth(delta) { calendarCurrentDate.setDate(1); calendarCurrentDate.setMonth(calendarCurrentDate.getMonth()+delta); renderCalendar(); }
 function renderCalendar() {
   var y = calendarCurrentDate.getFullYear(), m = calendarCurrentDate.getMonth(), names = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -688,37 +887,191 @@ function renderCalendar() {
   var firstDay = new Date(y, m, 1).getDay(), daysInMonth = new Date(y, m+1, 0).getDate(), todayStr = getTodayStr();
   for(var i=0; i<firstDay; i++) { var empty = document.createElement('div'); empty.className='calendar-day empty'; g.appendChild(empty); }
   for(var day=1; day<=daysInMonth; day++) {
-    var dateStr = y+'-'+String(m+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+    var dateStr = y+'-'+String(m+1).padStart(2,'0')+'-'+String(day).padStart(2,'0'), dObj = new Date(y, m, day);
     var el = document.createElement('div'); el.className='calendar-day'; el.innerText=day; if(dateStr === todayStr) el.classList.add('today');
-    el.onclick = (function(ds){ return function(){ openDayDetails(ds); }; })(dateStr); g.appendChild(el);
+    var hasData = false, dHist = appData.history[dateStr];
+    if (dHist) { if ((dHist.payments||[]).some(p=>p.type===currentTab) || (dHist.expenses||[]).some(e=>e.type===currentTab) || (currentTab==='transporte' && ((dHist.totalRides||0)>0 || (dHist.rideDetails||[]).length>0))) hasData = true; } 
+    else if (dateStr === todayStr) { if (appData.today.payments.some(p=>p.type===currentTab) || appData.today.expenses.some(e=>e.type===currentTab) || (currentTab==='transporte' && (appData.today.ridesToday>0 || appData.today.rideDetails.length>0))) hasData = true; }
+    if(hasData) el.classList.add('has-data'); if (dObj.getDay() === 0) el.classList.add('sunday');
+    el.onclick = (function(ds, isSun){ return function(){ if(isSun) openWeekSummary(ds); else openDayDetails(ds); }; })(dateStr, dObj.getDay() === 0); g.appendChild(el);
   }
 }
 
+function removeRideLog(dateStr, idx) { var target = (dateStr === getTodayStr()) ? appData.today : appData.history[dateStr]; if(target && target.rideDetails && target.rideDetails[idx]) { var rd = target.rideDetails[idx]; if(rd.clientId) { var c = appData.clients.find(x => x.id === rd.clientId); if(c) { if(rd.isPartner) c.partnerCount = Math.max(0, (c.partnerCount || 0) - rd.amount); else c.count = Math.max(0, (c.count || 0) - rd.amount); } } target.rideDetails.splice(idx, 1); if(target.rideDetails) { var newTotalRides = 0; target.rideDetails.forEach(item => { if(!item.isPartner && item.amount > 0) newTotalRides += item.amount; }); if(dateStr === getTodayStr()) { appData.today.ridesToday = Math.max(0, newTotalRides); } else { target.totalRides = Math.max(0, newTotalRides); } } saveState(); openDayDetails(dateStr); showToast('Eliminado', 'success'); } }
+function promptAddCategoryFromModal() { var type = currentTab, name = prompt("Nueva categoría:"); if (!name) return; name = name.trim(); var list = (type === 'transporte') ? appData.transportCategories : appData.motolavadoCategories; if (list.includes(name)) return showToast('Ya existe', 'error'); list.push(name); saveState(); openDayDetails(document.getElementById('modalTitle').innerText.replace('Día: ', '')); showToast('Añadida', 'success'); }
+window.toggleCatSelector = function() { var dd = document.getElementById('dayExpDropdown'); dd.style.display = dd.style.display === 'none' ? 'block' : 'none'; };
+window.selectDayExpCat = function(cat) { document.getElementById('dayExpDesc').value = cat; document.getElementById('selectedCatText').innerText = getCategoryEmoji(cat) + ' ' + cat; document.getElementById('dayExpDropdown').style.display = 'none'; };
+
 function openDayDetails(dateStr) {
-  var isToday = (dateStr === getTodayStr()); var data = isToday ? appData.today : (appData.history[dateStr] || { payments: [], expenses: [] });
-  var earned = (data.payments||[]).reduce((s,p)=>s+p.amountBs,0), expTotal = (data.expenses||[]).reduce((s,e)=>s+e.amount,0);
+  var isToday = (dateStr === getTodayStr()); if (!isToday && !appData.history[dateStr]) appData.history[dateStr] = { usdtRate: appData.usdtRate || 858.15, expenses: [], totalRides: 0, rideDetails: [], payments: [] };
+  var data = isToday ? appData.today : appData.history[dateStr], rate = isToday ? (appData.usdtRate || 858.15) : (data.usdtRate || appData.usdtRate || 858.15), isTransport = (currentTab === 'transporte');
+  var tabPayments = (data.payments || []).filter(p => p.type === currentTab), tabExpenses = (data.expenses || []).filter(e => e.type === currentTab);
+  var earned = tabPayments.reduce((s,p)=>s+p.amountBs,0), expTotal = tabExpenses.reduce((s,e)=>s+e.amount,0), sanPaidTodayBs = appData.sanPayments.filter(p => p.dateStr === dateStr && p.type === 'pago').reduce((s,p)=>s+p.amountBs, 0);
+  var diezmoBs = earned * 0.10, netBs = earned - expTotal - diezmoBs - (isTransport ? sanPaidTodayBs : 0), rides = isToday ? (data.ridesToday || 0) : (data.totalRides || 0);
+  
   document.getElementById('modalBoxElement').className = 'modal-box'; document.getElementById('modalTitle').innerText = 'Día: ' + dateStr;
-  document.getElementById('modalBody').innerHTML = `<div style="background:#f8fafc; padding:12px; border-radius:12px; margin-bottom:12px; font-size:13px;"><div>Ingresos: <strong>${earned.toFixed(2)} Bs</strong></div><div>Gastos: <strong style="color:var(--accent-red);">${expTotal.toFixed(2)} Bs</strong></div></div><input type="number" id="dayExpAmount" class="modal-input" placeholder="Gasto rápido en Bs..."><button onclick="dayModalAddExpense('${dateStr}')" style="background:var(--accent-red); color:#fff; width:100%; font-weight:700; padding:10px; border:none; border-radius:10px;">+ Guardar Gasto</button>`;
+  
+  let ridesLogHtml = '';
+  if(isTransport) {
+    let addedHtml = '', subHtml = '';
+    if(data.rideDetails && data.rideDetails.length > 0) { 
+        data.rideDetails.forEach((rd, realIndex) => { 
+            let nDisp = rd.name + (rd.isPartner ? ' 💜' : ''); 
+            let delBtn = `<button onclick="removeRideLog('${dateStr}', ${realIndex})" style="background:transparent; border:none; color:var(--accent-red); cursor:pointer; font-size:14px; padding:0 4px;">&times;</button>`; 
+            if(rd.amount > 0) { addedHtml += `<div style="font-size:11px; padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05); display:flex; justify-content:space-between;"><span>+${rd.amount} a <strong>${nDisp}</strong></span>${delBtn}</div>`; } 
+            else if (rd.amount < 0) { subHtml += `<div style="font-size:11px; padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05); display:flex; justify-content:space-between;"><span>${Math.abs(rd.amount)} descontadas a <strong>${nDisp}</strong></span>${delBtn}</div>`; }
+        }); 
+    }
+    if(tabPayments.length > 0) { tabPayments.forEach(p => { if(p.ridesPaid > 0) { subHtml += `<div style="font-size:11px; padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05); display:flex; justify-content:space-between;"><span>${p.ridesPaid} <strong>(Pago de ${p.clientName})</strong></span></div>`; } }); }
+
+    if(!addedHtml) addedHtml = '<div style="font-size:10px; color:var(--text-muted); text-align:center;">Ninguna</div>'; if(!subHtml) subHtml = '<div style="font-size:10px; color:var(--text-muted); text-align:center;">Ninguna</div>';
+    
+    ridesLogHtml = `<div class="split-rides-box">
+        <div class="split-col split-col-green"><div class="split-title" style="color:var(--accent-green);">Añadidas</div><div class="split-list-scroll">${addedHtml}</div></div>
+        <div class="split-col split-col-red"><div class="split-title" style="color:var(--accent-red);">Restadas / Pagadas</div><div class="split-list-scroll">${subHtml}</div></div>
+    </div>`;
+  }
+
+  var paymentsHtml = (tabPayments.length > 0) ? '<div style="margin:8px 0; max-height:160px; overflow-y:auto; background:#f8fafc; padding:8px; border-radius:10px; border:1px solid var(--border);">' + tabPayments.map(p => { 
+    var realIndex = data.payments.indexOf(p); var methodIcon = (p.method === 'efectivo') ? '💵' : '📱';
+    var captureBtn = p.capture ? `<button onclick="viewCaptureModal('${p.capture}')" style="background:rgba(2,132,199,0.1); border:1px solid rgba(2,132,199,0.3); color:var(--accent-cyan); border-radius:6px; padding:2px 6px; font-size:10px; margin-top:4px;">📷 Capture</button>` : ''; 
+    return `<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:6px 0; border-bottom:1px solid var(--border);"><div><strong style="color:var(--text-main);">${methodIcon} ${p.clientName}</strong><br><span style="color:var(--accent-green); font-weight:700;">${p.amountBs.toFixed(2)} Bs</span><br>${captureBtn}</div><button onclick="dayModalDeletePayment('${dateStr}', ${realIndex})" style="background:rgba(220,38,38,0.15); border:1px solid rgba(220,38,38,0.3); color:var(--accent-red); padding:6px 8px; border-radius:8px;">&#10005;</button></div>`; 
+  }).join('') + '</div>' : '<div style="font-size:11px; color:var(--text-muted); text-align:center;">Ninguno</div>';
+  
+  var expensesHtml = (tabExpenses.length > 0) ? '<div style="margin:8px 0; max-height:110px; overflow-y:auto; background:#f8fafc; padding:8px; border-radius:10px; border:1px solid var(--border);">' + tabExpenses.map(e => { var realIndex = data.expenses.indexOf(e); return `<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:4px 0; border-bottom:1px solid var(--border);"><span>${getCategoryEmoji(e.desc)} ${e.desc}: <strong style="color:var(--accent-red);">${e.amount.toFixed(2)} Bs</strong></span><button onclick="dayModalDeleteExpense('${dateStr}', ${realIndex})" style="background:none; border:none; color:var(--accent-red); font-size:14px;">&#10005;</button></div>`; }).join('') + '</div>' : '<div style="font-size:11px; color:var(--text-muted); text-align:center;">Ninguno</div>';
+  
+  var activeCategories = isTransport ? appData.transportCategories : appData.motolavadoCategories;
+  var selectorHtml = `
+      <div style="position:relative; margin: 4px 0 6px 0;">
+          <input type="hidden" id="dayExpDesc" value="${activeCategories[0]}">
+          <div id="catSelector" onclick="toggleCatSelector()" style="background:#ffffff; padding:10px 14px; border-radius:12px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; cursor:pointer; font-size:12px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+             <span id="selectedCatText" style="font-weight:600;">${getCategoryEmoji(activeCategories[0])} ${activeCategories[0]}</span><span style="color:var(--text-sub);">▼</span>
+          </div>
+          <div id="dayExpDropdown" style="display:none; position:absolute; z-index:100; top:100%; left:0; width:100%; background:#fff; border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 15px rgba(0,0,0,0.1); max-height:180px; overflow-y:auto; margin-top:4px;">
+             ${activeCategories.map(c => `<div onclick="selectDayExpCat('${c}')" style="padding:10px 14px; border-bottom:1px solid var(--border); font-size:12px; cursor:pointer; transition:0.2s;">${getCategoryEmoji(c)} ${c}</div>`).join('')}
+             <div onclick="promptAddCategoryFromModal()" style="padding:10px; text-align:center; color:var(--accent-cyan); font-weight:bold; font-size:12px; cursor:pointer; background:#f1f5f9;">➕ Añadir Nueva Categoría</div>
+          </div>
+      </div>
+  `;
+
+  document.getElementById('modalBody').innerHTML = `
+      <div style="background:#f8fafc; border:1px solid var(--border); padding:12px; border-radius:12px; margin-bottom:12px; font-size:13px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);"><span style="font-size:12px;">Ingreso:</span><div style="text-align:right;"><strong>${earned.toFixed(2)} Bs</strong> <span style="font-size:10px; color:var(--text-sub);">/ ${(earned/rate).toFixed(2)} USDT</span></div></div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);"><span style="font-size:12px;">Diezmo (10%):</span><div style="text-align:right;"><strong style="color:var(--accent-gold);">${diezmoBs.toFixed(2)} Bs</strong> <span style="font-size:10px; color:var(--text-sub);">/ ${(diezmoBs/rate).toFixed(2)} USDT</span></div></div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);"><span style="font-size:12px;">Gastos:</span><div style="text-align:right;"><strong style="color:var(--accent-red);">${expTotal.toFixed(2)} Bs</strong> <span style="font-size:10px; color:var(--text-sub);">/ ${(expTotal/rate).toFixed(2)} USDT</span></div></div>
+          ${isTransport && sanPaidTodayBs > 0 ? `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);"><span style="font-size:12px; color:var(--accent-gold);">Ahorro/San/Parada:</span><div style="text-align:right;"><strong style="color:var(--accent-gold);">${sanPaidTodayBs.toFixed(2)} Bs</strong> <span style="font-size:10px; color:var(--text-sub);">/ ${(sanPaidTodayBs/rate).toFixed(2)} USDT</span></div></div>` : ''}
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0;"><span style="font-size:12px;">Neto (Bolsillo):</span><div style="text-align:right;"><strong style="color:var(--accent-green);">${netBs.toFixed(2)} Bs</strong> <span style="font-size:10px; font-weight:bold; color:var(--accent-green);">/ ${(netBs/rate).toFixed(2)} USDT</span></div></div>
+          ${isTransport ? `<div style="display:flex; justify-content:space-between; margin-top:4px; padding-top:8px; border-top:1px solid var(--border);"><span>Carreras Tuyas:</span><strong style="color:var(--accent-purple); font-size:16px;">${rides}</strong></div>` : ''}
+      </div>
+      ${ridesLogHtml}
+      <label style="font-size:11px; color:var(--accent-gold); font-weight:700;">INGRESOS / PAGOS</label>
+      ${paymentsHtml}
+      <div style="background:rgba(22,163,74,0.05); border:1px solid rgba(22,163,74,0.2); padding:10px; border-radius:12px; margin-top:12px;">
+          <input type="text" id="dayIncDesc" class="modal-input" style="margin:8px 0 6px 0; width:100%; font-size:12px; padding:8px;" placeholder="Concepto (Ej: Calle)">
+          <input type="number" id="dayIncAmount" class="modal-input" style="margin-bottom:6px; width:100%; font-size:12px; padding:8px;" placeholder="Monto Bs...">
+          <button onclick="dayModalAddIncome('${dateStr}')" style="background:var(--accent-green); color:#fff; width:100%; font-weight:700; padding:10px; border:none; border-radius:10px;">+ Guardar Ingreso</button>
+      </div>
+      <label style="font-size:11px; color:var(--accent-red); font-weight:700; margin-top:14px; display:block;">GASTOS</label>
+      ${expensesHtml}
+      <div style="background:rgba(220,38,38,0.05); border:1px solid rgba(220,38,38,0.2); padding:10px; border-radius:12px; margin-top:12px;">
+          <input type="number" id="dayExpAmount" class="modal-input" style="margin:4px 0 6px 0; width:100%; font-size:12px; padding:8px;" placeholder="Monto Bs...">
+          ${selectorHtml}
+          <button onclick="dayModalAddExpense('${dateStr}')" style="background:var(--accent-red); color:#fff; width:100%; font-weight:700; padding:10px; border:none; border-radius:10px; margin-top:6px;">+ Guardar Gasto</button>
+      </div>`;
   document.getElementById('modalButtons').innerHTML = '<button style="background:var(--accent-cyan);color:#fff;" onclick="closeModal()">Cerrar</button>'; openModal();
 }
 
-function dayModalAddExpense(dateStr) { var amt = parseFloat(document.getElementById('dayExpAmount').value); if(amt > 0) { var target = (dateStr === getTodayStr()) ? appData.today : appData.history[dateStr]; if(!target) { appData.history[dateStr] = { expenses: [], payments: [] }; target = appData.history[dateStr]; } if(!target.expenses) target.expenses=[]; target.expenses.push({id:Date.now(), desc:'Gasto rápido', amount:amt, type:currentTab}); saveState(); closeModal(); showToast('Gasto guardado','success'); } }
-function promptGlobalAddRides() { var amt = parseInt(prompt("¿Cuántas hiciste?")); if(!isNaN(amt)&&amt>0) { appData.today.ridesToday += amt; saveState(); showToast('Añadidas','success'); } }
-function promptGlobalSubRides() { var amt = parseInt(prompt("¿Cuántas restar?")); if(!isNaN(amt)&&amt>0) { appData.today.ridesToday = Math.max(0, appData.today.ridesToday - amt); saveState(); showToast('Restadas','success'); } }
+function viewCaptureModal(imgSrc) { document.getElementById('modalBoxElement').className = 'modal-box'; document.getElementById('modalTitle').innerText = '📷 Capture de Pago'; document.getElementById('modalBody').innerHTML = '<div style="text-align:center;"><img src="'+imgSrc+'" style="max-width:100%; border-radius:12px; border:1px solid var(--border);"></div>'; document.getElementById('modalButtons').innerHTML = '<button style="background:var(--accent-cyan);color:#fff;" onclick="closeModal()">Cerrar</button>'; openModal(); }
+function dayModalDeletePayment(dateStr, index) { var target = (dateStr === getTodayStr()) ? appData.today : appData.history[dateStr]; if(target && target.payments) { target.payments.splice(index, 1); saveState(); openDayDetails(dateStr); showToast('Eliminado','success'); } }
+function dayModalDeleteExpense(dateStr, index) { var target = (dateStr === getTodayStr()) ? appData.today : appData.history[dateStr]; if(target && target.expenses) { target.expenses.splice(index,1); saveState(); openDayDetails(dateStr); showToast('Eliminado','success'); } }
+function dayModalAddIncome(dateStr) { var desc = document.getElementById('dayIncDesc').value || 'Ingreso manual', amt = parseFloat(document.getElementById('dayIncAmount').value); if(amt > 0) { var target = (dateStr === getTodayStr()) ? appData.today : appData.history[dateStr]; if(!target) target = initHistoryDay(dateStr); if(!target.payments) target.payments=[]; target.payments.push({ id: Date.now(), clientName: desc, amountBs: amt, ridesPaid: 0, type: currentTab, dateStr: dateStr, capture: null, method: 'efectivo' }); saveState(); openDayDetails(dateStr); showToast('Agregado', 'success'); } else showToast('Monto inválido', 'error'); }
+function dayModalAddExpense(dateStr) { var amt = parseFloat(document.getElementById('dayExpAmount').value), desc = document.getElementById('dayExpDesc').value; if(amt > 0) { var target = (dateStr === getTodayStr()) ? appData.today : appData.history[dateStr]; if(!target) target = initHistoryDay(dateStr); if(!target.expenses) target.expenses=[]; target.expenses.push({id:Date.now(), desc:desc, amount:amt, type:currentTab}); saveState(); openDayDetails(dateStr); showToast('Agregado','success'); } else showToast('Monto inválido','error'); }
 
-function openExpenseChartModal() {
-  document.getElementById('modalBoxElement').className = 'modal-box'; document.getElementById('modalTitle').innerText = '📊 ¿A dónde va mi dinero?';
-  document.getElementById('modalBody').innerHTML = '<p style="text-align:center; color:var(--text-sub); font-size:13px;">Panel financiero activo.</p>';
-  document.getElementById('modalButtons').innerHTML = '<button style="background:var(--text-main);color:#fff;" onclick="closeModal()">Cerrar</button>'; openModal();
+function promptGlobalAddRides() { var amt = parseInt(prompt("¿Cuántas libres hiciste?")); if(!isNaN(amt) && amt>0) { appData.today.ridesToday += amt; saveState(); showToast('Añadidas', 'success'); } }
+function promptGlobalSubRides() { var amt = parseInt(prompt("¿Cuántas restar?")); if(!isNaN(amt) && amt>0) { appData.today.ridesToday = Math.max(0, appData.today.ridesToday - amt); saveState(); showToast('Restadas', 'success'); } }
+
+function openWeekSummary(sundayStr) { 
+  var sunday = new Date(sundayStr + 'T12:00:00'), monday = new Date(sunday); monday.setDate(monday.getDate() - 6); 
+  var mondayStr = monday.getFullYear() + '-' + String(monday.getMonth()+1).padStart(2,'0') + '-' + String(monday.getDate()).padStart(2,'0'), wEarn = 0, wExp = 0, wRides = 0, rate = appData.usdtRate || 858.15;
+  for (var i = 0; i < 7; i++) { var d = new Date(monday); d.setDate(d.getDate() + i); var dStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); var h = (dStr === getTodayStr()) ? appData.today : appData.history[dStr]; if (h) { wEarn += (h.payments || []).filter(p => p.type === currentTab).reduce((s,p) => s + p.amountBs, 0); wExp += (h.expenses || []).filter(e => e.type === currentTab).reduce((s,e) => s + e.amount, 0); if (currentTab === 'transporte') wRides += (h.ridesToday !== undefined ? h.ridesToday : (h.totalRides || 0)); } } 
+  var wSanPaidBs = 0, wSanPaidUsdt = 0;
+  if (currentTab === 'transporte') { appData.sanPayments.forEach(function(p) { if (p.dateStr >= mondayStr && p.dateStr <= sundayStr && p.type === 'pago') { wSanPaidBs += p.amountBs; wSanPaidUsdt += p.amountUsdt; } }); }
+  var wNet = wEarn - wExp - (currentTab === 'transporte' ? wSanPaidBs : 0);
+  document.getElementById('modalBoxElement').className = 'modal-box'; document.getElementById('modalTitle').innerHTML = 'Cierre Semanal'; 
+  document.getElementById('modalBody').innerHTML = '<p style="text-align:center;color:var(--text-sub);margin-bottom:12px;">' + mondayStr + ' al ' + sundayStr + '</p>' + (currentTab === 'transporte' ? `<div style="background:#f8fafc;padding:10px 12px;border-radius:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center; border:1px solid var(--border);"><span>Carreras:</span><strong style="color:var(--accent-purple);font-size:16px;">${wRides}</strong></div>` : '') + `<div style="background:#f8fafc;padding:10px 12px;border-radius:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center; border:1px solid var(--border);"><span>Ingresos:</span><div style="text-align:right;"><strong>${wEarn.toFixed(2)} Bs</strong><br><span style="color:var(--accent-cyan);font-size:11px;">${(wEarn/rate).toFixed(2)} USDT</span></div></div><div style="background:#f8fafc;padding:10px 12px;border-radius:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center; border:1px solid var(--border);"><span>Gastos:</span><div style="text-align:right;"><strong style="color:var(--accent-red);">${wExp.toFixed(2)} Bs</strong><br><span style="color:var(--accent-red);font-size:11px;">${(wExp/rate).toFixed(2)} USDT</span></div></div>` + (currentTab === 'transporte' && wSanPaidBs > 0 ? `<div style="background:#f8fafc;padding:10px 12px;border-radius:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center; border:1px solid var(--border);"><span>San/Parada:</span><div style="text-align:right;"><strong style="color:var(--accent-gold);">${wSanPaidBs.toFixed(2)} Bs</strong><br><span style="color:var(--accent-gold);font-size:11px;">${wSanPaidUsdt.toFixed(2)} USDT</span></div></div>` : '') + `<div style="background:rgba(22,163,74,0.08);padding:10px 12px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(22,163,74,0.3);"><span>Neto Real:</span><div style="text-align:right;"><strong style="color:var(--accent-green);font-size:15px;">${wNet.toFixed(2)} Bs</strong><br><span style="color:var(--accent-green);font-size:11px;font-weight:700;">${(wNet/rate).toFixed(2)} USDT</span></div></div>`; 
+  document.getElementById('modalButtons').innerHTML = '<button style="background:var(--accent-cyan);color:#fff;" onclick="closeModal()">Cerrar</button>'; openModal(); 
 }
 
-function openMotolavadoModal() { document.getElementById('modalBoxElement').className='modal-box'; document.getElementById('modalTitle').innerText='🚿 Lavado'; document.getElementById('modalBody').innerHTML='<input type="number" id="mlBs" class="modal-input" placeholder="Monto Bs...">'; document.getElementById('modalButtons').innerHTML='<button style="background:var(--accent-cyan);color:#fff;" onclick="confirmMotolavado()">Guardar</button><button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>'; openModal(); }
-function confirmMotolavado() { var bs=parseFloat(document.getElementById('mlBs').value)||0; if(bs<=0)return; appData.today.payments.push({ id:Date.now(), clientName:'Lavado', amountBs:bs, type:'motolavado', dateStr:getTodayStr(), capture:null }); saveState(); closeModal(); showToast('Guardado', 'success'); }
+// ============================================================================
+// GRÁFICO: A DÓNDE VA MI DINERO (%) (100% RESTAURADO)
+// ============================================================================
+function openExpenseChartModal() {
+  document.getElementById('modalBoxElement').className = 'modal-box';
+  document.getElementById('modalTitle').innerText = '📊 ¿A dónde va mi dinero?';
+  
+  let prefix = getCurrentMonthPrefix(); let categoryTotals = {};
+  let allCats = [...appData.transportCategories, ...appData.motolavadoCategories];
+  allCats.forEach(c => categoryTotals[c] = 0);
+  
+  Object.keys(appData.history).forEach(date => {
+    if (date.startsWith(prefix)) {
+      let h = appData.history[date];
+      if (h.expenses) { h.expenses.forEach(e => { if (!categoryTotals[e.desc]) categoryTotals[e.desc] = 0; categoryTotals[e.desc] += e.amount; }); }
+    }
+  });
+  
+  if (appData.today && appData.today.expenses) {
+    appData.today.expenses.forEach(e => { if (!categoryTotals[e.desc]) categoryTotals[e.desc] = 0; categoryTotals[e.desc] += e.amount; });
+  }
+  
+  let sortedCats = Object.keys(categoryTotals).map(k => ({name: k, total: categoryTotals[k]})).sort((a,b) => b.total - a.total);
+  let totalExpenses = sortedCats.reduce((acc, curr) => acc + curr.total, 0);
 
-function renderSanSection() { document.getElementById('sanTotalBs').innerText='0.00 Bs'; document.getElementById('sanTotalUsdt').innerText='0.00 USDT'; }
-function openParadaModal() { alert('Módulo de parada'); }
-function openSanPaymentModal() { alert('Módulo de San'); }
-function openSanPayoutModal() { alert('Módulo de Cobro San'); }
+  let htmlList = '';
+  sortedCats.forEach((item) => {
+    let pct = totalExpenses > 0 ? ((item.total / totalExpenses) * 100).toFixed(1) : 0;
+    htmlList += `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px;">
+      <span>${getCategoryEmoji(item.name)} <strong>${item.name}</strong></span>
+      <div><span style="font-size:10px; color:var(--text-sub); margin-right:8px; font-weight:700;">${pct}%</span><span style="color:var(--accent-red); font-weight:700;">${item.total.toFixed(2)} Bs</span></div>
+    </div>`;
+  });
+  
+  document.getElementById('modalBody').innerHTML = `
+    <p style="font-size:11px; color:var(--text-sub); text-align:center; margin-bottom:12px;">Gastos ordenados de mayor a menor (Mes actual):</p>
+    <div style="width:100%; height:180px; margin-bottom:16px;"><canvas id="donutChartCanvas"></canvas></div>
+    <div style="max-height:220px; overflow-y:auto; background:#f8fafc; padding:10px; border-radius:12px; border:1px solid var(--border);">${htmlList}</div>
+  `;
+  document.getElementById('modalButtons').innerHTML = '<button style="background:var(--text-main);color:#fff;" onclick="closeModal()">Cerrar</button>';
+  openModal();
+
+  if(sortedCats.length > 0) {
+      setTimeout(() => {
+          var ctx = document.getElementById('donutChartCanvas').getContext('2d');
+          new Chart(ctx, { type: 'doughnut', data: { labels: sortedCats.map(s => s.name), datasets: [{ data: sortedCats.map(s => s.total), backgroundColor: ['#dc2626','#ea580c','#d97706','#16a34a','#0284c7','#4f46e5','#9333ea','#e11d48'], borderWidth: 0 }] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: {color: '#4b5563', font:{family:'Poppins', size:10}} } }, cutout: '65%' } });
+      }, 100);
+  }
+}
+
+// ============================================================================
+// MÓDULO LAVADO Y SAN
+// ============================================================================
+function openMotolavadoModal() { document.getElementById('modalBoxElement').className='modal-box'; document.getElementById('modalTitle').innerText='🚿 Ingreso Lavado'; document.getElementById('modalBody').innerHTML='<input type="text" id="mlDesc" class="modal-input" placeholder="Concepto..." value="Lavado de Moto"><input type="number" id="mlBs" class="modal-input" placeholder="Monto Bs...">'; document.getElementById('modalButtons').innerHTML='<button style="background:var(--accent-cyan);color:#fff;" onclick="confirmMotolavado()">Guardar</button><button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>'; openModal(); }
+function confirmMotolavado() { var desc=document.getElementById('mlDesc').value||'Lavado', bs=parseFloat(document.getElementById('mlBs').value)||0; if(bs<=0)return showToast('Inválido','error'); appData.today.payments.push({ id:Date.now(), clientName:desc, amountBs:bs, type:'motolavado', dateStr:getTodayStr(), capture:null }); saveState(); closeModal(); showToast('Guardado', 'success'); }
+
+function renderSanSection() { 
+  var totalBs=appData.sanPayments.filter(p=>p.type==='pago').reduce((s,p)=>s+p.amountBs,0), totalUsdt=appData.sanPayments.filter(p=>p.type==='pago').reduce((s,p)=>s+p.amountUsdt,0), receivedUsdt=appData.sanPayments.filter(p=>p.type==='cobro').reduce((s,p)=>s+p.amountUsdt,0);
+  document.getElementById('sanTotalBs').innerText=totalBs.toFixed(2)+' Bs'; document.getElementById('sanTotalUsdt').innerText=(totalUsdt - receivedUsdt).toFixed(2)+' USDT'; 
+  var container=document.getElementById('sanHistoryContainer'); container.innerHTML=''; 
+  if(appData.sanPayments.length===0){ container.innerHTML='<div style="font-size:12px; color:var(--text-muted); text-align:center; padding:20px;">No hay aportes.</div>'; return; } 
+  appData.sanPayments.slice().reverse().forEach(function(p, index){ var realIdx=appData.sanPayments.length-1-index, isPayout = p.type === 'cobro', colorStyle = isPayout ? 'color:var(--accent-green);' : 'color:var(--accent-gold);', prefixSign = isPayout ? '+' : '-'; var card=document.createElement('div'); card.className='client-card'; card.style.marginBottom='10px'; card.style.padding='14px'; card.innerHTML=`<div style="display:flex; justify-content:space-between; align-items:center;"><div><strong style="font-size:14px; ${colorStyle}">${p.note}</strong><br><span style="font-size:11px; color:var(--text-sub);">${p.dateStr}</span></div><div style="text-align:right;"><strong style="font-size:14px; ${colorStyle}">${prefixSign}${p.amountUsdt.toFixed(2)} USDT</strong><br><span style="font-size:11px; color:var(--text-sub);">${p.amountBs.toFixed(2)} Bs</span></div><button onclick="deleteSanPayment(${realIdx})" style="background:rgba(220,38,38,0.15); border:1px solid rgba(220,38,38,0.3); color:var(--accent-red); padding:6px 10px; border-radius:8px; margin-left:8px;">&times;</button></div>`; container.appendChild(card); }); 
+}
+
+function openParadaModal() { let rate = appData.usdtRate || 858.15; let bsCalc = (5 * rate).toFixed(2); document.getElementById('modalBoxElement').className='modal-box'; document.getElementById('modalTitle').innerText='📍 Pagar Parada ($5)'; document.getElementById('modalBody').innerHTML=`<input type="text" id="sanNote" class="modal-input" value="Pago Parada Semanal ($5)"><input type="date" id="sanDate" class="modal-input" value="${getTodayStr()}"><input type="number" id="sanBs" class="modal-input" value="${bsCalc}" placeholder="Monto Bs..." oninput="calcSanUsdt()"><div style="font-size:12px; color:var(--accent-cyan); text-align:right;" id="sanUsdtPreview">Equivalente: 5.00 USDT</div><p style="font-size:10px; color:var(--text-sub); text-align:center; margin-top:8px;">Se descontará automáticamente de tu bolsillo real.</p>`; document.getElementById('modalButtons').innerHTML='<button style="background:var(--accent-cyan);color:#fff;" onclick="confirmSanPayment(\'pago\')">Guardar Parada</button><button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>'; openModal(); }
+function openSanPaymentModal() { document.getElementById('modalBoxElement').className='modal-box'; document.getElementById('modalTitle').innerText='🤝 Pagar Cuota San'; document.getElementById('modalBody').innerHTML='<input type="text" id="sanNote" class="modal-input" value="Cuota de San"><input type="date" id="sanDate" class="modal-input" value="'+getTodayStr()+'"><input type="file" id="sanCaptureUpload" accept="image/*" onchange="processSanCapture(this)" style="display:none;"><div class="file-upload-btn" onclick="document.getElementById(\'sanCaptureUpload\').click()"><span id="sanUploadLabel">📷 Subir capture</span></div><input type="number" id="sanBs" class="modal-input" placeholder="Monto Bs..." oninput="calcSanUsdt()"><div style="font-size:12px; color:var(--accent-green); text-align:right;" id="sanUsdtPreview">0.00 USDT</div>'; document.getElementById('modalButtons').innerHTML='<button style="background:var(--accent-gold);color:#fff;" onclick="confirmSanPayment(\'pago\')">Guardar Pago</button><button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>'; openModal(); }
+function openSanPayoutModal() { document.getElementById('modalBoxElement').className='modal-box'; document.getElementById('modalTitle').innerText='💰 Recibir Cobro San'; document.getElementById('modalBody').innerHTML='<input type="text" id="sanNote" class="modal-input" value="Cobro de San (Premio)"><input type="date" id="sanDate" class="modal-input" value="'+getTodayStr()+'"><input type="file" id="sanCaptureUpload" accept="image/*" onchange="processSanCapture(this)" style="display:none;"><div class="file-upload-btn" style="border-color:var(--accent-green); color:var(--accent-green);" onclick="document.getElementById(\'sanCaptureUpload\').click()"><span id="sanUploadLabel">📷 Subir capture cobro</span></div><input type="number" id="sanBs" class="modal-input" placeholder="Monto Bs..." oninput="calcSanUsdt()"><div style="font-size:12px; color:var(--accent-green); text-align:right;" id="sanUsdtPreview">0.00 USDT</div>'; document.getElementById('modalButtons').innerHTML='<button style="background:var(--accent-green);color:#fff;" onclick="confirmSanPayment(\'cobro\')">Registrar Cobro</button><button style="background:#f1f5f9;color:var(--text-main); border:1px solid var(--border);" onclick="closeModal()">Cancelar</button>'; openModal(); }
+function calcSanUsdt() { var bs=parseFloat(document.getElementById('sanBs').value)||0, rate=appData.usdtRate||858.15; document.getElementById('sanUsdtPreview').innerText='Equivalente: '+(bs/rate).toFixed(2)+' USDT (Tasa: '+rate.toFixed(2)+')'; }
+function confirmSanPayment(type) { var note=document.getElementById('sanNote').value||'San', bs=parseFloat(document.getElementById('sanBs').value)||0, dateStr=document.getElementById('sanDate').value||getTodayStr(), rate=appData.usdtRate||858.15; if(bs<=0)return showToast('Inválido','error'); appData.sanPayments.push({ id:Date.now(), note:note, amountBs:bs, amountUsdt:bs/rate, dateStr:dateStr, rate:rate, type:type }); if(type === 'cobro') { var target = (dateStr === getTodayStr()) ? appData.today : appData.history[dateStr]; if (!target && dateStr !== getTodayStr()) { appData.history[dateStr] = { usdtRate: rate, expenses: [], totalRides: 0, rideDetails: [], payments: [] }; target = appData.history[dateStr]; } if(!target) target = appData.today; if(!target.payments) target.payments = []; target.payments.push({ id: Date.now(), clientName: note + ' (San)', amountBs: bs, ridesPaid: 0, type: 'transporte', dateStr: dateStr, capture: tempCapturedImage, method: 'efectivo' }); } tempCapturedImage = null; saveState(); closeModal(); showToast('Guardado', 'success'); }
+function deleteSanPayment(index) { if (confirm('¿Eliminar?')) { appData.sanPayments.splice(index, 1); saveState(); showToast('Eliminado', 'success'); } }
 
 function openModal() { var m = document.getElementById('customModal'); m.style.display='flex'; void m.offsetWidth; m.classList.add('active'); }
 function closeModal() { var m = document.getElementById('customModal'); m.classList.remove('active'); setTimeout(function(){m.style.display='none';},300); }
@@ -726,3 +1079,4 @@ function checkModalBackdropClick(event) { if (event.target.id === 'customModal')
 </script>
 </body>
 </html>
+

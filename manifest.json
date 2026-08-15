@@ -1,14 +1,14 @@
 {
   "name": "carrerasAPP Premium",
   "short_name": "carrerasAPP",
-  "scope": "/CarrerasApp/",
-  "start_url": "/CarrerasApp/index.html",
+  "scope": "https://orlando13146604-byte.github.io/CarrerasApp/",
+  "start_url": "https://orlando13146604-byte.github.io/CarrerasApp/index.html",
   "display": "standalone",
   "background_color": "#f4f7f9",
   "theme_color": "#0284c7",
   "icons": [{"src": "https://cdn-icons-png.flaticon.com/512/1048/1048313.png", "sizes": "512x512", "type": "image/png"}],
   "share_target": {
-    "action": "/CarrerasApp/index.html?shared=true",
+    "action": "https://orlando13146604-byte.github.io/CarrerasApp/index.html?shared=true",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {

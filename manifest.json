@@ -1,21 +1,25 @@
 {
-  "name": "carrerasAPP Premium",
+  "name": "carrerasAPP",
   "short_name": "carrerasAPP",
-  "scope": "https://orlando13146604-byte.github.io/CarrerasApp/",
-  "start_url": "https://orlando13146604-byte.github.io/CarrerasApp/index.html",
+  "description": "Finanzas personales y gestión de mototaxi — offline-first",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f4f7f9",
-  "theme_color": "#0284c7",
-  "icons": [{"src": "https://cdn-icons-png.flaticon.com/512/1048/1048313.png", "sizes": "512x512", "type": "image/png"}],
-  "share_target": {
-    "action": "https://orlando13146604-byte.github.io/CarrerasApp/index.html?shared=true",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "title": "name",
-      "text": "description",
-      "url": "link",
-      "files": [{ "name": "file", "accept": ["image/*"] }]
+  "orientation": "portrait",
+  "background_color": "#0d0d1a",
+  "theme_color": "#0d0d1a",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon_512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
-  }
+  ]
 }
